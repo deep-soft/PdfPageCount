@@ -10,7 +10,7 @@ unit PdfPageCount;
 *******************************************************************************)
 
 ////////////////////////////////////////////////////////////////////////////////
-// Summary of steps taken to parse a PDF doc for its page count :-              
+// Summary of steps taken to parse a PDF doc for its page count :-             Â 
 ////////////////////////////////////////////////////////////////////////////////
 //1.  See if there's a 'Linearization dictionary' for easy parsing.
 //    Mostly there isn't so ...
@@ -39,6 +39,7 @@ const
   PDF_ERROR_FILE_OPEN       = -2;
   PDF_ERROR_FILE_FORMAT     = -3;
   PDF_ERROR_ENCRYPTED_STRM  = -4;
+  PDF_ERROR_NO_INDEX        = -5;
 
 (*******************************************************************************
 * GetPageCount                                                                 *
@@ -902,6 +903,7 @@ begin
   //if the Index array is empty then use the default values ...
   if length(indexArray) = 0 then
   begin
+    Result := PDF_ERROR_NO_INDEX;
     setLength(indexArray, 2);
     indexArray[0] := 0;
     indexArray[1] := bufferSize div (w1 + w2 + w3);
@@ -950,7 +952,8 @@ begin
 
   DisposeBuffer;
 
-  QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
+  if PdfObjList.Count > 1 then
+    QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
   if not GotoObject(rootNum) then exit;
   if not FindStrInDict('/Pages') then exit;
   //get the Pages' object number, go to it and get the page count ...
@@ -1057,7 +1060,8 @@ begin
     //Make sure we've got Root's object number ...
     if rootNum = $FFFFFFFF then exit;
 
-    QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
+    if PdfObjList.Count > 1 then
+      QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
     if not GotoObject(rootNum) then exit;
 
     if not FindStrInDict('/Pages') then exit;
@@ -1122,3 +1126,4 @@ end;
 //------------------------------------------------------------------------------
 
 end.
+

@@ -3,14 +3,14 @@ unit PdfPageCount;
 (*******************************************************************************
 * Author    :  Angus Johnson                                                   *
 * Version   :  2.02                                                            *
-* Date      :  26 April 2023                                                     *
+* Date      :  26 April 2023                                                   *
 * Website   :  http://www.angusj.com                                           *
 * Copyright :  Angus Johnson 2010-2022                                         *
 * License   :  http://www.boost.org/LICENSE_1_0.txt                            *
 *******************************************************************************)
 
 ////////////////////////////////////////////////////////////////////////////////
-// Summary of steps taken to parse a PDF doc for its page count :-              
+// Summary of steps taken to parse a PDF doc for its page count :-             Â 
 ////////////////////////////////////////////////////////////////////////////////
 //1.  See if there's a 'Linearization dictionary' for easy parsing.
 //    Mostly there isn't so ...
@@ -31,7 +31,17 @@ unit PdfPageCount;
 interface
 
 uses
-  Windows, SysUtils, Classes, AnsiStrings, ZLib;
+{$IFNDEF LINUX} 
+  Windows, 
+{$ENDIF}
+  SysUtils, 
+  Classes, 
+{$IFNDEF FPC} 
+  AnsiStrings, 
+  ZLib;
+{$ELSE}
+  PasZLib;
+{$ENDIF}
 
 const
   PDF_NO_ERROR              =  0;
@@ -39,6 +49,7 @@ const
   PDF_ERROR_FILE_OPEN       = -2;
   PDF_ERROR_FILE_FORMAT     = -3;
   PDF_ERROR_ENCRYPTED_STRM  = -4;
+  PDF_ERROR_NO_INDEX        = -5;
 
 (*******************************************************************************
 * GetPageCount                                                                 *
@@ -102,8 +113,11 @@ type
 // Miscellaneous functions
 //------------------------------------------------------------------------------
 
-procedure QuickSortList(SortList: TPointerList;
-  L, R: Integer; sortFunc: TSortFunc);
+{$IFDEF FPC}
+procedure QuickSortList(SortList: PPointerList; L, R: Integer; sortFunc: TSortFunc);
+{$ELSE}
+procedure QuickSortList(SortList: TPointerList; L, R: Integer; sortFunc: TSortFunc);
+{$ENDIF}
 var
   I, J: Integer;
   P, T: Pointer;
@@ -692,12 +706,16 @@ begin
 
   try
     //decompress the stream ...
+{$IFDEF FPC}
+    uncompress(pointer(buffer), cardinal(bufferSize), PChar(p), cardinal(len));
+{$ELSE}
     //nb: I'm not sure in which Delphi version these functions were renamed.
     {$IFDEF UNICODE}
     zlib.ZDecompress(p, len, pointer(buffer), bufferSize);
     {$ELSE}
     zlib.DecompressBuf(p, len, len*3, pointer(buffer), bufferSize);
     {$ENDIF}
+{$ENDIF}
   except
     ErrorFlag := PDF_ERROR_ENCRYPTED_STRM;
     buffer := nil;
@@ -727,7 +745,12 @@ begin
       'f': dec(p, 8); 'e': dec(p, 7); 'x': dec(p, 5);
       'r': dec(p, 3); 'a': dec(p, 2); 't': dec(p, 1);
       's':
+
+{$IFDEF FPC}
+        if StrLComp(p, 'startxref', 9) = 0 then
+{$ELSE}
         if AnsiStrings.StrLComp(p, 'startxref', 9) = 0 then
+{$ENDIF}
         begin
           result := true;
           inc(p, 9);
@@ -749,7 +772,11 @@ begin
   result := false;
   pStop := p + 32;
   while (p < pStop) and (p^ <> 'o') do inc(p);
+{$IFDEF FPC}
+  if StrLComp( p, 'obj', 3) <> 0 then exit;
+{$ELSE}
   if AnsiStrings.StrLComp( p, 'obj', 3) <> 0 then exit;
+{$ENDIF}
   pStart := p;
   if not FindStrInDict('/Linearized') then exit;
   p := pStart;
@@ -819,6 +846,7 @@ begin
   //if the Index array is empty then use the default values ...
   if length(indexArray) = 0 then
   begin
+    Result := PDF_ERROR_NO_INDEX;
     setLength(indexArray, 2);
     indexArray[0] := 0;
     indexArray[1] := bufferSize div (w1 + w2 + w3);
@@ -868,7 +896,8 @@ begin
   DisposeBuffer;
   if rootNum < 0 then exit;
 
-  QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
+  if PdfObjList.Count > 1 then
+     QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
   if not GotoObject(rootNum) then exit;
   if not FindStrInDict('/Pages') then exit;
   //get the Pages' object number, go to it and get the page count ...
@@ -920,7 +949,11 @@ begin
       (k >= ms.size) then exit;
 
     p :=  PAnsiChar(ms.Memory) + k;
+{$IFDEF FPC}
+    if StrLComp(p, 'xref', 4) <> 0 then
+{$ELSE}
     if AnsiStrings.StrLComp(p, 'xref', 4) <> 0 then
+{$ENDIF}
     begin
       //'xref' table not found so assume the doc contains
       //a cross-reference stream instead (ie PDF doc ver 1.5+)
@@ -975,7 +1008,8 @@ begin
     //Make sure we've got Root's object number ...
     if rootNum < 0 then exit;
 
-    QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
+    if PdfObjList.Count > 1 then
+      QuickSortList(PdfObjList.List, 0, PdfObjList.Count -1, ListSort);
     if not GotoObject(rootNum) then exit;
 
     if not FindStrInDict('/Pages') then exit;

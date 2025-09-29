@@ -61,6 +61,9 @@ function GetPageCount(const filename: string): integer;
 
 implementation
 
+const
+  MAX_buffer_Size = 64*1024*1024;
+
 type
 
   PPdfObj = ^TPdfObj;
@@ -707,6 +710,8 @@ begin
   try
     //decompress the stream ...
 {$IFDEF FPC}
+    bufferSize := MAX_buffer_Size;
+    ReallocMem(buffer, bufferSize);
     uncompress(pointer(buffer), cardinal(bufferSize), PChar(p), cardinal(len));
 {$ELSE}
     //nb: I'm not sure in which Delphi version these functions were renamed.
@@ -1049,3 +1054,4 @@ end;
 //------------------------------------------------------------------------------
 
 end.
+

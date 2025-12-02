@@ -38,10 +38,11 @@ uses
   Classes, 
 {$IFNDEF FPC} 
   AnsiStrings, 
-  ZLib;
+  ZLib,
 {$ELSE}
-  PasZLib;
+  PasZLib,
 {$ENDIF}
+  MD5;
 
 const
   PDF_NO_ERROR              =  0;
@@ -1161,4 +1162,5 @@ end;
 //------------------------------------------------------------------------------
 
 end.
+
 
